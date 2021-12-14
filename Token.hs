@@ -2,6 +2,7 @@ module Token where
 
 import Control.Applicative (liftA2)
 import Data.Foldable (asum)
+import Data.Maybe (isNothing, fromJust)
 import Data.Char
 import Text.Parsec as P
 import Structure
@@ -14,13 +15,10 @@ special :: Parsec String () Char
 special = oneOf "(),;[]`{}"
           
 whitespace :: Parsec String () String
-whitespace = do
-    start <- whitestuff
-    more <- many whitestuff
-    return $ start ++ concat more
+whitespace = concat <$> many1 whitestuff
 
 whitestuff :: Parsec String () String
-whitestuff = fmap (:"") whitechar <|> comment <|> ncomment
+whitestuff = fmap (:"") whitechar <|> try comment <|> try ncomment <?> "whitespace"
 
 whitechar :: Parsec String () Char
 whitechar = Token.newline <|> vertab <|> Token.space <|> Token.tab <|> uniWhite
@@ -128,11 +126,11 @@ hexit :: Parsec String () Char
 hexit = Token.digit <|> oneOf "abcdefABCDEF"
 
 
-varid :: Parsec String () String
-varid = ((:) <$> small <*> many (small <|> large <|> Token.digit <|> P.char '\'')) `exclude` reservedid
+varid :: Parsec String () Token
+varid = toToken $ liftA2 (:) small (many $ small <|> large <|> Token.digit <|> P.char '\'') `exclude` reservedid
 
-conid :: Parsec String () String
-conid = (:) <$> large <*> many (small <|> large <|> Token.digit <|> P.char '\'')
+conid :: Parsec String () Token
+conid = toToken $ liftA2 (:) large $ many (small <|> large <|> Token.digit <|> P.char '\'')
 
 reservedid :: Parsec String () String
 reservedid = let ids = ["case", "class", "data", "default", "deriving", "do", "else",
@@ -140,35 +138,40 @@ reservedid = let ids = ["case", "class", "data", "default", "deriving", "do", "e
                         "let", "module", "newtype", "of", "then", "type", "where", "_"]
              in asum $ map P.string ids
 
-varsym :: Parsec String () String
-varsym = ((:) <$> symbol <*> many (symbol <|> P.char ':')) `exclude` (reservedop <|> dashes)
+varsym :: Parsec String () Token
+varsym = toToken $ liftA2 (:) symbol (many (symbol <|> P.char ':')) `exclude` (reservedop <|> dashes)
 
-consym :: Parsec String () String
-consym = ((:) <$> P.char ':' <*> many (symbol <|> P.char ':')) `exclude` reservedop
+consym :: Parsec String () Token
+consym = toToken $ liftA2 (:) (P.char ':') (many (symbol <|> P.char ':')) `exclude` reservedop
 
 reservedop :: Parsec String () String
 reservedop = let ops = ["..", ":", "::", "=", "\\", "|", "<-", "->", "@", "~", "=>"]
              in asum $ map P.string ops
 
-modid :: Parsec String () String
+modid :: Parsec String () Token
 modid = conid
 
-qparser :: Parsec String () String -> Parsec String () String
+qparser :: Parsec String () Token -> Parsec String () Token
 qparser p = do
-        mod <- many $ liftA2 (++) modid $ P.string "."
-        v <- p
-        return $ concat mod ++ v
+        start <- getPosition
+        Token v _ _ _ _ <- p
+        mod <- many $ try $ do
+            P.string "."
+            Token str _ _ _ _ <- modid <?> "module name"
+            return $ "." ++ str
+        end <- getPosition
+        return $ Token (v ++ concat mod) (sourceColumn start) (sourceColumn end) (sourceLine start) (sourceLine end)
 
-qvarid :: Parsec String () String
+qvarid :: Parsec String () Token
 qvarid = qparser varid
 
-qvarsym :: Parsec String () String
+qvarsym :: Parsec String () Token
 qvarsym = qparser varsym
 
-qconid :: Parsec String () String
+qconid :: Parsec String () Token
 qconid = qparser conid
 
-qconsym :: Parsec String () String
+qconsym :: Parsec String () Token
 qconsym = qparser consym
 
 decimal :: Parsec String () String
@@ -255,9 +258,69 @@ gap = do
     return $ "\\" ++ [start] ++ end ++ "\\"
 
 
+inParentheses :: Parsec String () a -> Parsec String () a
+inParentheses p = do
+    P.char '('
+    optional whitespace
+    token <- p
+    optional whitespace
+    P.char ')'
+    return token
+
+inBackticks :: Parsec String () a -> Parsec String () a
+inBackticks p = do
+    P.char '`'
+    optional whitespace
+    token <- p
+    optional whitespace
+    P.char '`'
+    return token
+
+
+var, qvar, con, qcon, varop, qvarop, conop, qconop, op, qop :: Parsec String () Token
+var = varid <|> inParentheses varsym
+qvar = qvarid <|> inParentheses qvarsym
+con = conid <|> inParentheses consym
+qcon = qconid <|> inParentheses qconsym
+varop = varsym <|> inBackticks varid
+qvarop = qvarsym <|> inBackticks qvarid
+conop = consym <|> inBackticks conid
+qconop = qconsym <|> inBackticks qconid
+op = varop <|> conop
+qop = qvarop <|> qconop
+
+
+
+toToken :: Parsec String () String -> Parsec String () Token
+toToken p = do
+    start <- getPosition
+    str <- p
+    end <- getPosition
+    return $ Token str (sourceColumn start) (sourceColumn end) (sourceLine start) (sourceLine end)
+
 
 exclude :: (Eq a, Stream s m t) => ParsecT s u m a -> ParsecT s u m a -> ParsecT s u m a
 exclude p1 p2 = do
-    a1 <- lookAhead p1
-    a2 <- lookAhead p2
-    if a1 == a2 then p1 else parserZero
+    a1 <- try $ lookAhead p1
+    a2 <- optionMaybe $ try $ lookAhead p2
+    if isNothing a2 || a1 /= fromJust a2 then p1 else parserZero
+
+
+block :: String -> String -> String -> Parsec String () a -> Parsec String () [a]
+block left right sep item = do
+    let seperator = do
+            optional whitespace
+            P.string sep
+            optional whitespace
+    P.string left
+    optional whitespace
+    items <- item `sepEndBy` try seperator
+    optional whitespace
+    P.string right
+    return items
+
+curlyBracketBlock :: Parsec String () a -> Parsec String () [a]
+curlyBracketBlock = block "{" "}" ";"
+
+parenthesesBlock :: Parsec String () a -> Parsec String () [a]
+parenthesesBlock = block "(" ")" ","
