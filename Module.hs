@@ -55,7 +55,24 @@ impExpConValues =
 
 
 body :: Parsec String () Body
-body = (`Body` []) <$> curlyBracketBlock imports
+body = do
+    let seperator = do
+            optional whitespace
+            P.char ';'
+            optional whitespace
+    P.char '{'
+    optional whitespace
+    is <- imports `sepBy` seperator
+
+    ds <- case is of
+        [] -> topDecl `sepBy` seperator
+        _  -> seperator *> topDecl `sepBy` seperator
+
+    optional whitespace
+    optional $ P.char ';'
+    optional whitespace
+    P.char '}'
+    return $ Body is ds
 
 
 imports :: Parsec String () Import
@@ -78,3 +95,7 @@ importSpec =
     let impVar = Imp'Var <$> var
         impCon = impExpCon Imp'Con conid
     in impVar <|> impCon
+
+
+topDecl :: Parsec String () TopDecl
+topDecl = undefined
