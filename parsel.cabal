@@ -1,0 +1,105 @@
+cabal-version:      2.4
+name:               parsel
+version:            0.1.0.0
+
+-- A short (one-line) description of the package.
+-- synopsis:
+
+-- A longer description of the package.
+-- description:
+
+-- A URL where users can report bugs.
+-- bug-reports:
+
+-- The license under which the package is released.
+-- license:
+author:             pedeEli
+maintainer:         74102959+pedeEli@users.noreply.github.com
+
+-- A copyright notice.
+-- copyright:
+-- category:
+extra-source-files: CHANGELOG.md
+
+library step-1
+    exposed-modules:  Text.Parsel
+                    , Text.Parsel.Primitives
+                    , Test
+    build-depends:    base ^>=4.16.4.0
+    hs-source-dirs:   step-1
+    default-language: Haskell2010
+
+library step-2
+    exposed-modules:  Text.Parsel
+                    , Text.Parsel.Primitives
+                    , Text.Parsel.Error
+                    , Test
+    build-depends:    base ^>=4.16.4.0
+    hs-source-dirs:   step-2
+    default-language: Haskell2010
+
+library step-3
+    exposed-modules:  Text.Parsel
+                    , Text.Parsel.Primitives
+                    , Text.Parsel.Error
+                    , Text.Parsel.Pos
+                    , Test
+    build-depends:    base ^>=4.16.4.0
+    hs-source-dirs:   step-3
+    default-language: Haskell2010
+
+library step-4
+    exposed-modules:  Text.Parsel
+                    , Text.Parsel.Primitives
+                    , Text.Parsel.Error
+                    , Text.Parsel.Pos
+                    , Text.Parsel.Char
+                    , Test
+    build-depends:    base ^>=4.16.4.0
+    hs-source-dirs:   step-4
+    default-language: Haskell2010
+
+library step-5
+    exposed-modules:  Text.Parsel
+                    , Text.Parsel.Primitives
+                    , Text.Parsel.Error
+                    , Text.Parsel.Pos
+                    , Text.Parsel.Char
+                    , Test
+    build-depends:    base ^>=4.16.4.0
+    hs-source-dirs:   step-5
+    default-language: Haskell2010
+
+library json-example
+    exposed-modules:  Text.Parsel
+                    , Text.Parsel.Primitives
+                    , Text.Parsel.Error
+                    , Text.Parsel.Pos
+                    , Text.Parsel.Char
+                    , Test
+    build-depends:    base ^>=4.16.4.0
+                    , scientific
+                    , containers
+                    , text
+                    , vector
+    hs-source-dirs:   json-example
+    default-language: Haskell2010
+
+library parsec-test
+    exposed-modules:  Test
+    build-depends:    base ^>=4.16.4.0
+                    , parsec
+    hs-source-dirs:   parsec-test
+    default-language: Haskell2010
+
+executable parsel
+    main-is:          Main.hs
+
+    -- Modules included in this executable, other than Main.
+    -- other-modules:
+
+    -- LANGUAGE extensions used by modules in this package.
+    -- other-extensions:
+    build-depends:    base ^>=4.16.4.0
+    hs-source-dirs:   app
+    default-language: Haskell2010
