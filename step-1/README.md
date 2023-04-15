@@ -9,7 +9,7 @@ newtype Parsel s a = Parsel {
            -> (ParseError -> b)           -- called when failed
            -> b}
 ```
-which makes sense, a parser either succeeds or it fails but this misses a key detail. We have no idea if the parser has consumed any input or not. This feature is is extremly important which we will see later down the road. Our actual [definition](https://github.com/pedeEli/haskell-parser/blob/c76a7b9b31dd8ceafa07059551dd43aaedeeb6f8/step-1/Text/Parsel/Primitives.hs#L8-L15) is
+which makes sense, a parser either succeeds or it fails but this misses a key detail. We have no idea if the parser has consumed any input or not. This feature is is extremly important which we will see later down the road. Our actual definition is
 
 ```haskell
 newtype Parsel s a = Parsel {
