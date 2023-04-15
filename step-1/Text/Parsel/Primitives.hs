@@ -4,6 +4,8 @@ module Text.Parsel.Primitives where
 import Control.Monad
 import Control.Applicative
 
+data Nat = Zero | Succ Nat
+
 type ParseError = [String]
 newtype Parsel s a = Parsel {
   unParsel :: forall b.
