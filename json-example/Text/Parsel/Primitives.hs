@@ -21,6 +21,9 @@ data State s = State {
   stateInput :: s,
   statePos :: SourcePos}
 
+getPos :: Parsel s SourcePos
+getPos = Parsel $ \s@(State _ pos) _ _ eok _ -> eok pos s (unknownError s)
+
 
 runParsel :: Parsel s a -> SourceName -> s -> Either ParseError a
 runParsel p name s = unParsel p (State s (initialPos name)) cok cerr eok eerr

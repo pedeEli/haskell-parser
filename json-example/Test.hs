@@ -32,37 +32,38 @@ import Debug.Trace (traceM)
 
 type Array = Vector JSON
 type Object = Map Text JSON
-data JSON = JsonNull
-          | JsonBool Bool
-          | JsonNumber Scientific
-          | JsonString Text
-          | JsonArray Array
-          | JsonObject Object
+data JSON = JsonNull              SourcePos
+          | JsonBool   Bool       SourcePos
+          | JsonNumber Scientific SourcePos 
+          | JsonString Text       SourcePos 
+          | JsonArray  Array      SourcePos 
+          | JsonObject Object     SourcePos 
   deriving (Show)
 
 prettyShow :: JSON -> String
-prettyShow JsonNull = "null"
-prettyShow (JsonBool True) = "true"
-prettyShow (JsonBool False) = "false"
-prettyShow (JsonNumber s) = show s
-prettyShow (JsonString s) = show s
-prettyShow (JsonArray arr) = "[\n" ++ unlines (map ("  " ++) $ lines values) ++ "]"
+prettyShow (JsonNull _) = "null"
+prettyShow (JsonBool True _) = "true"
+prettyShow (JsonBool False _) = "false"
+prettyShow (JsonNumber s _) = show s
+prettyShow (JsonString s _) = show s
+prettyShow (JsonArray arr _) = "[\n" ++ unlines (map ("  " ++) $ lines values) ++ "]"
   where values = intercalate ",\n" $ V.toList $ fmap prettyShow arr
-prettyShow (JsonObject obj) = "{\n" ++ unlines (map ("  " ++) $ lines pairs) ++ "}"
+prettyShow (JsonObject obj _) = "{\n" ++ unlines (map ("  " ++) $ lines pairs) ++ "}"
   where pairs = intercalate ",\n" $ map (\(key, value) -> show key ++ ": " ++ prettyShow value) $ M.toList obj
 
 
 
-jsonNull :: Parsel String JSON
+
+jsonNull :: Parsel String (SourcePos -> JSON)
 jsonNull = string "null" $> JsonNull
 
 
-jsonBool :: Parsel String JSON
+jsonBool :: Parsel String (SourcePos -> JSON)
 jsonBool = (string "true"  $> JsonBool True) <|>
            (string "false" $> JsonBool False)
 
 
-jsonNumber :: Parsel String JSON
+jsonNumber :: Parsel String (SourcePos -> JSON)
 jsonNumber = do
   sign <- option "" (string "-")
 
@@ -72,7 +73,8 @@ jsonNumber = do
   decimal <- option "" decimalP
   exponent <- option "" exponentP
 
-  return $ JsonNumber $ read $ sign ++ digits ++ decimal ++ exponent
+  let scientific = read (sign ++ digits ++ decimal ++ exponent)
+  return (JsonNumber scientific)
   where
     decimalP = do
       char '.'
@@ -110,20 +112,21 @@ literal = concat <$> (char '"' *> many l <* char '"')
           | isHexDigit c && isUpper c = fromEnum c - fromEnum 'A' + 10
 
 
-jsonString :: Parsel String JSON
+jsonString :: Parsel String (SourcePos -> JSON)
 jsonString = JsonString . T.pack <$> literal
 
 
-jsonArray :: Parsel String JSON
+jsonArray :: Parsel String (SourcePos -> JSON)
 jsonArray = do
   char '['
   spaces
   arr <- sepBy jsonValue (char ',')
   char ']'
-  return $ JsonArray $ V.fromList arr
+  let vector = V.fromList arr
+  return (JsonArray vector)
 
 
-jsonObject :: Parsel String JSON
+jsonObject :: Parsel String (SourcePos -> JSON)
 jsonObject = do
   char '{'
   spaces
@@ -135,11 +138,17 @@ jsonObject = do
         return (T.pack key, value)
   obj <- sepBy pair (char ',' *> spaces)
   char '}'
-  return $ JsonObject $ M.fromList obj
+  let map = M.fromList obj
+  return (JsonObject map)
 
 
 jsonValue :: Parsel String JSON
-jsonValue = spaces *> asum values <* spaces
+jsonValue = do
+  spaces
+  pos <- getPos
+  value <- asum values
+  spaces
+  return (value pos)
   where values = map try [
           jsonNull,
           jsonBool,
